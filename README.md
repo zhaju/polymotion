@@ -1,5 +1,7 @@
 # Polymotion - Polymarket Price Movement Dashboard
 
+![](public/logobig.png)
+
 A React web application that displays the top Polymarket questions with the biggest price movements over the last 24 hours.
 
 ## Features
