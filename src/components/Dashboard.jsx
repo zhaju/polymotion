@@ -2,6 +2,7 @@
 import { RefreshCw, Moon, Sun } from 'lucide-react';
 import polymarketApi from '../services/polymarketApi';
 import { processRealMarketData } from '../utils/marketAnalyzer';
+import logoImg from '/logo.png';
 
 const Dashboard = () => {
   const [markets, setMarkets] = useState([]);
@@ -193,8 +194,13 @@ const Dashboard = () => {
       <div className="max-w-7xl mx-auto">
         <div className={`rounded-lg shadow-md p-6 mb-6 border ${theme.cardBackground} transition-colors duration-300`}>
           <div className="flex justify-between items-center mb-4">
-            <h1 className={`text-3xl font-bold ${theme.primaryText}`}>
-              Polymotion 📈
+            <h1 className={`text-3xl font-bold ${theme.primaryText} flex items-center gap-3`}>
+              Polymotion 
+              <img 
+                src={logoImg} 
+                alt="Polymotion Logo" 
+                className="h-8 w-8"
+              />
             </h1>
             <div className="flex items-center space-x-3">
               <button
