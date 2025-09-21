@@ -1,4 +1,4 @@
-# Polymotion - Polymarket Price Movement Dashboard
+# Polymotion
 
 ![](public/logobig.png)
 
