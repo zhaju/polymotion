@@ -222,7 +222,7 @@ const Dashboard = () => {
           </div>
           
           <p className={`mb-4 ${theme.secondaryText}`}>
-            Prediction markets ranked by 24-hour price movement
+            Prediction markets ranked by 24-hour price movement, so you know what's breaking.
           </p>
           
           {lastUpdated && (
