@@ -158,7 +158,7 @@ const Dashboard = () => {
     mutedText: 'text-gray-500 dark:text-gray-400',
     categoryCount: 'text-white dark:text-gray-400',
     primaryButton: 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 text-white border-blue-500 dark:border-blue-500',
-    secondaryButton: 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600',
+    secondaryButton: 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600',
     successStatus: 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300',
     warningStatus: 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-300',
     errorStatus: 'bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-700 text-red-700 dark:text-red-200',
@@ -265,7 +265,7 @@ const Dashboard = () => {
                 }`}
               >
                 {category === 'all' ? 'All Categories' : category.charAt(0).toUpperCase() + category.slice(1)} 
-                <span className={`ml-1 ${category === 'all' ? theme.categoryCount : theme.mutedText}`}>
+                <span className={`ml-1 ${selectedCategory === category ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`}>
                   ({category === 'all' ? markets.length : markets.filter(m => m.category === category).length})
                 </span>
               </button>
