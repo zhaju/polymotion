@@ -190,9 +190,9 @@ const Dashboard = () => {
   }
 
   return (
-    <div className={`min-h-screen p-4 border ${theme.borderColor} ${theme.pageBackground} transition-colors duration-300`}>
+    <div className={`min-h-screen p-4 border ${theme.borderColor} ${theme.pageBackground}`}>
       <div className="max-w-7xl mx-auto">
-        <div className={`rounded-lg shadow-md p-6 mb-6 border ${theme.cardBackground} transition-colors duration-300`}>
+        <div className={`rounded-lg shadow-md p-6 mb-6 border ${theme.cardBackground}`}>
           <div className="flex justify-between items-center mb-4">
             <h1 className={`text-3xl font-bold ${theme.primaryText} flex items-center gap-3`}>
               Polymotion 
@@ -245,13 +245,13 @@ const Dashboard = () => {
           )}
           
           {error && (
-            <div className={`mt-4 p-4 border rounded-lg ${theme.errorStatus} transition-colors duration-300`}>
+            <div className={`mt-4 p-4 border rounded-lg ${theme.errorStatus}`}>
               <p className="text-sm">{error}</p>
             </div>
           )}
         </div>
 
-        <div className={`rounded-lg shadow-md p-6 mb-6 border ${theme.cardBackground} transition-colors duration-300`}>
+        <div className={`rounded-lg shadow-md p-6 mb-6 border ${theme.cardBackground}`}>
           <h2 className={`text-lg font-semibold mb-4 ${theme.primaryText}`}>Filter by Category</h2>
           <div className="flex flex-wrap gap-2">
             {categories.map(category => (
@@ -273,10 +273,10 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className={`rounded-lg shadow-md overflow-hidden border ${theme.cardBackground} transition-colors duration-300`}>
+        <div className={`rounded-lg shadow-md overflow-hidden border ${theme.cardBackground}`}>
           <div className="overflow-x-auto">
             <table className="min-w-full border-collapse">
-              <thead className={`${theme.tableHeader} transition-colors duration-300`}>
+              <thead className={`${theme.tableHeader}`}>
                 <tr className={`border-b ${theme.borderColor}`}>
                   <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme.cellBorder} ${theme.mutedText}`}>
                     Question
@@ -301,11 +301,11 @@ const Dashboard = () => {
                   </th>
                 </tr>
               </thead>
-              <tbody className={`${theme.tableBody} transition-colors duration-300`}>
+              <tbody className={`${theme.tableBody}`}>
                 {filteredMarkets.map((market, index) => (
                   <tr 
                     key={market.id} 
-                    className={`transition-colors duration-200 border-b ${theme.borderColor} ${
+                    className={`border-b ${theme.borderColor} ${
                       index % 2 === 0 ? theme.tableRowEven : theme.tableRowOdd
                     } ${theme.tableRow}`}
                   >
