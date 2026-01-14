@@ -10,7 +10,6 @@ const Dashboard = () => {
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [isUsingRealData, setIsUsingRealData] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   const categories = ['all', 'politics', 'sports', 'crypto', 'entertainment', 'technology', 'finance', 'weather', 'other'];
@@ -45,39 +44,6 @@ const Dashboard = () => {
     localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
   }, [isDarkMode]);
 
-  // Intelligent category detection
-  const detectCategory = (market) => {
-    let category = 'other';
-
-    if (market.tags && market.tags.length > 0) {
-      const relevantTag = market.tags.find(tag => tag !== 'All' && tag !== 'all');
-      if (relevantTag) {
-        category = relevantTag.toLowerCase();
-      }
-    }
-
-    if (category === 'other') {
-      const questionLower = (market.question || '').toLowerCase();
-      if (questionLower.includes('trump') || questionLower.includes('biden') || questionLower.includes('election') || questionLower.includes('president')) {
-        category = 'politics';
-      } else if (questionLower.includes('bitcoin') || questionLower.includes('ethereum') || questionLower.includes('crypto')) {
-        category = 'crypto';
-      } else if (questionLower.includes('nfl') || questionLower.includes('nba') || questionLower.includes('super bowl') || questionLower.includes('championship')) {
-        category = 'sports';
-      } else if (questionLower.includes('ai') || questionLower.includes('artificial intelligence') || questionLower.includes('tech')) {
-        category = 'technology';
-      } else if (questionLower.includes('stock') || questionLower.includes('market') || questionLower.includes('economy')) {
-        category = 'finance';
-      } else if (questionLower.includes('movie') || questionLower.includes('music') || questionLower.includes('celebrity')) {
-        category = 'entertainment';
-      } else if (questionLower.includes('hurricane') || questionLower.includes('weather') || questionLower.includes('climate')) {
-        category = 'weather';
-      }
-    }
-
-    return category;
-  };
-
   const fetchMarketData = async () => {
     console.log('🔄 Fetching market data...');
     setLoading(true);
@@ -95,8 +61,6 @@ const Dashboard = () => {
         throw new Error('Unexpected API response format');
       }
 
-      setIsUsingRealData(true);
-
       const processedMarkets = processRealMarketData(marketsArray);
       console.log(`📈 Processed ${processedMarkets.length} unresolved markets from ${marketsArray.length} total markets`);
 
@@ -105,30 +69,7 @@ const Dashboard = () => {
     } catch (err) {
       console.error('🚨 Dashboard: Error fetching market data:', err);
       setError(err.message);
-      setIsUsingRealData(false);
-
-      if (err.message.includes('internet connection') ||
-          err.message.includes('rate limit') ||
-          err.message.includes('experiencing issues')) {
-        setMarkets([]);
-      } else {
-        console.log('🔄 Using minimal fallback data due to API error');
-        const sampleData = [
-          {
-            id: 'sample-1',
-            question: 'Will Bitcoin reach $200,000 by end of 2026?',
-            category: 'crypto',
-            currentPrice: 0.45,
-            high: 0.52,
-            low: 0.38,
-            movement: 0.52 - 0.38,
-            volume24h: 25000,
-            endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-            resolved: false
-          }
-        ];
-        setMarkets(sampleData);
-      }
+      setMarkets([]);
     } finally {
       setLoading(false);
     }
@@ -236,10 +177,8 @@ const Dashboard = () => {
               <p className={`text-sm ${theme.mutedText}`}>
                 Last updated: {lastUpdated.toLocaleTimeString()}
               </p>
-              <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                isUsingRealData ? theme.successStatus : theme.warningStatus
-              }`}>
-                {isUsingRealData ? '🟢 Real Data' : '🟡 Sample Data'}
+              <div className={`px-3 py-1 rounded-full text-xs font-medium ${theme.successStatus}`}>
+                🟢 Live Data
               </div>
             </div>
           )}

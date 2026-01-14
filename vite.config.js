@@ -8,4 +8,13 @@ export default defineConfig({
   css: {
     postcss: './postcss.config.cjs',
   },
+  server: {
+    proxy: {
+      '/api/gamma': {
+        target: 'https://gamma-api.polymarket.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/gamma/, ''),
+      },
+    },
+  },
 })

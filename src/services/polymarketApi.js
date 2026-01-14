@@ -1,74 +1,138 @@
 import axios from 'axios';
 
-const POLYMARKET_CLOB_API = 'https://clob.polymarket.com';
+// Use Vite proxy in development, CORS proxy in production
+const isDev = import.meta.env.DEV;
+const GAMMA_API_BASE = 'https://gamma-api.polymarket.com';
+const CORS_PROXY = 'https://corsproxy.io/?';
 
 class PolymarketAPI {
   constructor() {
-    this.clobClient = axios.create({
-      baseURL: POLYMARKET_CLOB_API,
+    this.isDev = isDev;
+    this.gammaClient = axios.create({
       headers: {
         'Content-Type': 'application/json',
       },
-      timeout: 10000,
+      timeout: 15000,
     });
   }
 
-  // No filtering - return all markets
-  filterRecentMarkets(allMarkets) {
-    console.log(`📅 Returning all ${allMarkets.length} markets without filtering`);
-    return this.sortAndReturnMarkets(allMarkets, 'all markets (no filtering)');
+  getUrl(path) {
+    if (this.isDev) {
+      return `/api/gamma${path}`;
+    }
+    return CORS_PROXY + encodeURIComponent(`${GAMMA_API_BASE}${path}`);
   }
-  
-  sortAndReturnMarkets(markets, description) {
-    // Sort by end date, then by closed status
+
+  // Sort markets by end date
+  sortMarkets(markets) {
     const sortedMarkets = markets.sort((a, b) => {
       // Sort by end date (future dates first)
-      if (a.end_date_iso && b.end_date_iso) {
-        const aDate = new Date(a.end_date_iso);
-        const bDate = new Date(b.end_date_iso);
+      const aEndDate = a.endDate || a.end_date_iso;
+      const bEndDate = b.endDate || b.end_date_iso;
+
+      if (aEndDate && bEndDate) {
+        const aDate = new Date(aEndDate);
+        const bDate = new Date(bEndDate);
         const now = new Date();
-        
+
         // Future dates first, then by proximity
         if (aDate > now && bDate <= now) return -1;
         if (aDate <= now && bDate > now) return 1;
-        if (aDate > now && bDate > now) return aDate - bDate; // Soonest future first
-        return bDate - aDate; // Most recent past first
+        if (aDate > now && bDate > now) return aDate - bDate;
+        return bDate - aDate;
       }
-      
+
       // Prioritize non-closed markets
       if (a.closed !== b.closed) return a.closed ? 1 : -1;
-      
+
       return 0;
     });
-    
-    console.log(`✅ Returning ${sortedMarkets.length} ${description}`);
+
     return sortedMarkets;
   }
 
-  // Get all markets with basic info using CLOB API
+  // Normalize Gamma API market data to match expected format
+  normalizeMarket(market) {
+    // Extract outcome prices from outcomePrices string (e.g., "[0.95, 0.05]")
+    let tokens = [];
+    const outcomes = market.outcomes ? JSON.parse(market.outcomes) : ['Yes', 'No'];
+    const prices = market.outcomePrices ? JSON.parse(market.outcomePrices) : [0.5, 0.5];
+
+    tokens = outcomes.map((outcome, index) => ({
+      outcome: outcome,
+      price: prices[index] || 0.5,
+      winner: false
+    }));
+
+    return {
+      condition_id: market.conditionId || market.id,
+      question_id: market.questionId,
+      question: market.question,
+      description: market.description,
+      end_date_iso: market.endDate,
+      market_slug: market.slug,
+      closed: market.closed || false,
+      archived: market.archived || false,
+      active: market.active !== false,
+      tokens: tokens,
+      tags: market.tags || [],
+      volume24hr: parseFloat(market.volume24hr) || 0,
+      volumeNum: parseFloat(market.volumeNum) || 0,
+      liquidity: parseFloat(market.liquidity) || 0,
+      // Keep original data for reference
+      _original: market
+    };
+  }
+
+  // Fetch markets using Gamma API events endpoint
   async fetchMarkets(limit = 100, offset = 0) {
     try {
-      console.log(`🔄 Fetching markets from CLOB API...`);
-      
-      const response = await this.clobClient.get('/markets', {
-        params: {
-          limit: 500,
-          offset: 0
-        }
+      console.log(`🔄 Fetching markets from Gamma API...`);
+
+      // Build URL with query params
+      const params = new URLSearchParams({
+        limit: limit.toString(),
+        offset: offset.toString(),
+        order: 'id',
+        ascending: 'false',
+        closed: 'false'
       });
-      
-      const markets = response.data?.data || response.data || [];
-      console.log(`✅ Fetched ${markets.length} markets from API`);
-      
-      if (markets.length === 0) {
-        throw new Error('No markets available from Polymarket API');
+      const url = this.getUrl(`/events?${params.toString()}`);
+
+      // Fetch active events with their markets
+      const response = await this.gammaClient.get(url);
+
+      const events = response.data || [];
+      console.log(`✅ Fetched ${events.length} events from Gamma API`);
+
+      // Extract all markets from events
+      let allMarkets = [];
+      for (const event of events) {
+        if (event.markets && Array.isArray(event.markets)) {
+          for (const market of event.markets) {
+            // Add event-level data to market
+            const enrichedMarket = {
+              ...market,
+              eventTitle: event.title,
+              eventSlug: event.slug,
+              tags: event.tags || market.tags || []
+            };
+            allMarkets.push(this.normalizeMarket(enrichedMarket));
+          }
+        }
       }
-      
-      return this.filterRecentMarkets(markets);
-      
+
+      console.log(`📊 Extracted ${allMarkets.length} markets from events`);
+
+      if (allMarkets.length === 0) {
+        throw new Error('No markets available from Polymarket Gamma API');
+      }
+
+      return this.sortMarkets(allMarkets);
+
     } catch (error) {
-      console.error('🚨 CLOB API failed:', error.message);
-      
+      console.error('🚨 Gamma API failed:', error.message);
+
       // Provide user-friendly error handling
       if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
         throw new Error('Unable to connect to Polymarket API. Please check your internet connection.');

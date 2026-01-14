@@ -1,4 +1,4 @@
-import { differenceInHours, parseISO, isAfter, addDays, subDays } from 'date-fns';
+import { differenceInHours, parseISO } from 'date-fns';
 
 export class MarketAnalyzer {
   constructor() {
@@ -177,229 +177,151 @@ export class MarketAnalyzer {
   }
 }
 
-// Process real Polymarket API data
+// Process Polymarket Gamma API data
 export function processRealMarketData(markets) {
-  console.log('🔍 === DEBUGGING processRealMarketData ===');
-  console.log('📥 Input markets:', markets);
-  console.log('📊 Input markets type:', typeof markets);
-  console.log('📈 Input markets is array:', Array.isArray(markets));
+  console.log('🔍 === Processing Gamma API Market Data ===');
   console.log('📋 Input markets length:', markets?.length);
-  
+
   // Handle case where markets is undefined or not an array
   if (!markets) {
     console.error('❌ processRealMarketData: markets is undefined or null');
     return [];
   }
-  
+
   if (!Array.isArray(markets)) {
     console.error('❌ processRealMarketData: markets is not an array, got:', typeof markets);
     return [];
   }
-  
+
   if (markets.length === 0) {
     console.warn('⚠️ processRealMarketData: markets array is empty');
     return [];
   }
-  
+
   console.log('📝 First 3 market samples:', markets.slice(0, 3).map(m => ({
     id: m.condition_id,
-    question: m.question,
-    end_date: m.end_date_iso,
+    question: m.question?.substring(0, 50),
     tokens: m.tokens?.length || 0
   })));
-  
-  const now = new Date();
 
-  console.log('🎯 Starting filtering process...');
-  let totalProcessed = 0;
-  let passedStrictFilters = 0;
-  let passedRelaxedFilters = 0;
-  
-  // First pass: strict filters for truly unresolved markets
-  const strictFiltered = markets
-    .filter(market => {
-      totalProcessed++;
-      console.log(`🔍 [${totalProcessed}/${markets.length}] Filtering market ${market.condition_id}: "${market.question?.substring(0, 50)}..."`);
-      
-      // Only include markets that have NOT been resolved yet
-      if (market.closed === true) {
-        console.log(`❌ Market ${market.condition_id} rejected: market is closed`);
-        return false;
-      }
-      
-      if (market.archived === true) {
-        console.log(`❌ Market ${market.condition_id} rejected: market is archived`);
-        return false;
-      }
-      
-      // Must have basic data
-      if (!market.condition_id || !market.question) {
-        console.log(`❌ Market ${market.condition_id} rejected: missing basic data`);
-        return false;
-      }
-      
-      passedStrictFilters++;
-      console.log(`✅ Market ${market.condition_id} PASSED strict filters (${passedStrictFilters}/${totalProcessed})`);
-      return true;
+  // Filter for active, non-closed markets
+  const activeMarkets = markets.filter(market => {
+    // Must have basic data
+    if (!market.condition_id || !market.question) {
+      return false;
+    }
+
+    // Exclude closed and archived markets
+    if (market.closed === true || market.archived === true) {
+      return false;
+    }
+
+    return true;
+  });
+
+  console.log(`✅ ${activeMarkets.length} active markets after filtering`);
+
+  // Process each market
+  const processed = activeMarkets.map(market => {
+    // Get valid tokens with prices
+    let validTokens = (market.tokens || []).filter(token => {
+      return token && (token.price !== undefined && token.price !== null);
     });
 
-  // If we don't have enough unresolved markets, use relaxed filters
-  let marketsToProcess = strictFiltered;
-  
-  if (strictFiltered.length < 5) {
-    console.log('Only ' + strictFiltered.length + ' strictly unresolved markets found. Using relaxed filters...');
-    
-    // Second pass: very relaxed filters to show some markets
-    const relaxedFiltered = markets
-      .filter(market => {
-        // Very relaxed criteria: just not archived and has basic data
-        if (market.archived === true) {
-          return false;
-        }
-        
-        // Must have basic data
-        if (!market.condition_id || !market.question) {
-          return false;
-        }
-        
-        passedRelaxedFilters++;
-        return true;
-      });
-    
-    marketsToProcess = relaxedFiltered;
-    console.log(`🔸 ${relaxedFiltered.length} markets passed relaxed filters`);
-  }
-  
-  const filtered = marketsToProcess
-    .map(market => {
-      console.log(`Processing market ${market.condition_id} for display...`);
-      
-      // Get valid tokens with prices - VERY PERMISSIVE 
-      const validTokens = market.tokens.filter(token => {
-        return token && (token.price !== undefined && token.price !== null);
-      });
-      
-      // If no valid tokens, create a dummy one
-      if (validTokens.length === 0) {
-        validTokens.push({ outcome: 'Yes', price: '0.5' });
-      }
-      
-      // Try to find the primary outcome token (Yes, first team, etc.)
-      let primaryToken = validTokens.find(token => 
-        token.outcome && (
-          token.outcome.toLowerCase().includes('yes') ||
-          token.outcome.toLowerCase().includes('win') ||
-          token.outcome.toLowerCase() === 'trump' ||
-          token.outcome.toLowerCase() === 'biden'
-        )
-      ) || validTokens[0];
-      
-      // Handle any price format
-      let currentPrice = 0.5; // default
-      if (primaryToken.price !== undefined && primaryToken.price !== null) {
-        if (typeof primaryToken.price === 'string') {
-          currentPrice = parseFloat(primaryToken.price) || 0.5;
-        } else if (typeof primaryToken.price === 'number') {
-          currentPrice = primaryToken.price;
-        }
-      }
-      console.log(`Market ${market.condition_id} - current price: ${currentPrice} (type: ${typeof primaryToken.price})`);
-      
-      // Calculate movement based on token price spread - VERY PERMISSIVE
-      const prices = validTokens.map(token => {
-        if (typeof token.price === 'string') {
-          return parseFloat(token.price) || 0.5;
-        } else if (typeof token.price === 'number') {
-          return token.price;
-        }
-        return 0.5;
-      }).filter(p => !isNaN(p));
-      
-      const tokenSpread = prices.length > 1 ? Math.max(...prices) - Math.min(...prices) : 0.1;
-      
-      // Use token spread as basis for movement, add some variation
-      const baseVariation = Math.max(0.05, Math.min(0.20, tokenSpread * 1.5));
-      const randomVariation = (Math.random() - 0.5) * baseVariation;
-      
-      const high = Math.min(1, currentPrice + Math.abs(randomVariation));
-      const low = Math.max(0, currentPrice - Math.abs(randomVariation));
-      const movement = high - low;
-      
-      console.log(`Market ${market.condition_id} - movement: ${movement}, high: ${high}, low: ${low}`);
-      
-      // Create analyzer instance to use categorization
-      const analyzer = new MarketAnalyzer();
-      
-      // Determine category from market question and tags
-      let category = 'other';
-      if (market.tags && market.tags.length > 0) {
-        // Use the first tag that's not "All"
-        const relevantTag = market.tags.find(tag => tag !== 'All');
-        if (relevantTag) {
-          category = relevantTag.toLowerCase();
-        }
-      }
-      
-      // If no good tag found, categorize by question
-      if (category === 'other') {
-        category = analyzer.categorizeMarket(market);
-      }
-      
-      // Generate reasonable volume based on market metadata
-      let volume24h = 5000 + (Math.random() * 50000);
-      
-      return {
-        id: market.condition_id || market.question_id,
-        question: market.question,
-        category: category,
-        currentPrice: parseFloat(currentPrice.toFixed(4)),
-        high: parseFloat(high.toFixed(4)),
-        low: parseFloat(low.toFixed(4)),
-        movement: parseFloat(movement.toFixed(4)),
-        volume24h: Math.floor(volume24h),
-        endDate: market.end_date_iso,
-        description: market.description,
-        tags: market.tags || [],
-        // Additional real market data
-        marketSlug: market.market_slug,
-        tokens: validTokens.map(token => ({
-          outcome: token.outcome || 'Unknown',
-          price: (() => {
-            if (typeof token.price === 'string') {
-              return parseFloat(token.price) || 0.5;
-            } else if (typeof token.price === 'number') {
-              return token.price;
-            }
-            return 0.5;
-          })(),
-          winner: token.winner
-        }))
-      };
-    })
-    .sort((a, b) => b.movement - a.movement);
+    // If no valid tokens, create a default
+    if (validTokens.length === 0) {
+      validTokens = [{ outcome: 'Yes', price: 0.5 }];
+    }
 
-  console.log(`🎉 === PROCESSING COMPLETE ===`);
-  console.log(`📊 Total input markets: ${markets.length}`);
-  console.log(`✅ Strict unresolved markets: ${passedStrictFilters}`);
-  console.log(`🔸 Relaxed recent markets: ${passedRelaxedFilters}`);
-  console.log(`🏆 Final processed markets: ${filtered.length}`);
-  console.log(`📈 Top 3 by movement:`, filtered.slice(0, 3).map(m => ({
-    question: m.question?.substring(0, 50),
-    movement: m.movement,
-    currentPrice: m.currentPrice
-  })));
-  
-  if (filtered.length === 0) {
-    console.log('❌ No markets found even with relaxed criteria - this explains empty dashboard');
-    console.log('\nSample markets from API:');
-    markets.slice(0, 5).forEach((market, i) => {
-      console.log(`[${i+1}] ${market.question?.slice(0, 50)}`);
-      console.log(`    Active: ${market.active}, Closed: ${market.closed}, Archived: ${market.archived}`);
-      console.log(`    Tokens: ${market.tokens?.length || 0}`);
-    });
+    // Find the primary outcome token (Yes, first option, etc.)
+    const primaryToken = validTokens.find(token =>
+      token.outcome && (
+        token.outcome.toLowerCase().includes('yes') ||
+        token.outcome.toLowerCase().includes('win')
+      )
+    ) || validTokens[0];
+
+    // Get current price
+    let currentPrice = 0.5;
+    if (primaryToken.price !== undefined && primaryToken.price !== null) {
+      currentPrice = typeof primaryToken.price === 'string'
+        ? parseFloat(primaryToken.price) || 0.5
+        : primaryToken.price;
+    }
+
+    // Calculate price movement based on token spread
+    const prices = validTokens.map(token => {
+      return typeof token.price === 'string' ? parseFloat(token.price) || 0.5 : token.price;
+    }).filter(p => !isNaN(p));
+
+    const tokenSpread = prices.length > 1 ? Math.max(...prices) - Math.min(...prices) : 0.1;
+    const baseVariation = Math.max(0.05, Math.min(0.20, tokenSpread * 1.5));
+    const randomVariation = (Math.random() - 0.5) * baseVariation;
+
+    const high = Math.min(1, currentPrice + Math.abs(randomVariation));
+    const low = Math.max(0, currentPrice - Math.abs(randomVariation));
+    const movement = high - low;
+
+    // Create analyzer instance for categorization
+    const analyzer = new MarketAnalyzer();
+
+    // Determine category from tags (Gamma API returns tag objects or strings)
+    let category = 'other';
+    if (market.tags && market.tags.length > 0) {
+      // Handle both string tags and tag objects from Gamma API
+      const tagNames = market.tags.map(tag => {
+        if (typeof tag === 'string') return tag;
+        if (tag && tag.label) return tag.label;
+        if (tag && tag.slug) return tag.slug;
+        return '';
+      }).filter(t => t && t.toLowerCase() !== 'all');
+
+      if (tagNames.length > 0) {
+        category = tagNames[0].toLowerCase();
+      }
+    }
+
+    // If no good tag found, categorize by question content
+    if (category === 'other') {
+      category = analyzer.categorizeMarket(market);
+    }
+
+    // Use actual volume from API if available, otherwise estimate
+    const volume24h = market.volume24hr || market.volumeNum || (5000 + Math.random() * 50000);
+
+    return {
+      id: market.condition_id || market.question_id,
+      question: market.question,
+      category: category,
+      currentPrice: parseFloat(currentPrice.toFixed(4)),
+      high: parseFloat(high.toFixed(4)),
+      low: parseFloat(low.toFixed(4)),
+      movement: parseFloat(movement.toFixed(4)),
+      volume24h: Math.floor(volume24h),
+      endDate: market.end_date_iso,
+      description: market.description,
+      tags: market.tags || [],
+      marketSlug: market.market_slug,
+      tokens: validTokens.map(token => ({
+        outcome: token.outcome || 'Unknown',
+        price: typeof token.price === 'string' ? parseFloat(token.price) || 0.5 : token.price,
+        winner: token.winner
+      }))
+    };
+  })
+  .sort((a, b) => b.movement - a.movement);
+
+  console.log(`🎉 Processing complete: ${processed.length} markets ready for display`);
+
+  if (processed.length > 0) {
+    console.log('📈 Top 3 by movement:', processed.slice(0, 3).map(m => ({
+      question: m.question?.substring(0, 50),
+      movement: m.movement.toFixed(4),
+      price: m.currentPrice.toFixed(2)
+    })));
   }
-  
-  return filtered;
+
+  return processed;
 }
 
 export default new MarketAnalyzer();
